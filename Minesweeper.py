@@ -92,16 +92,16 @@ class Board:
 
     def count_checked(self, row: int, column: int) -> int:
         checked = 0
-        for r in range(max(0, row - 1), min(self.height, row + 1)):
-            for c in range(max(0, column - 1), min(self.width, column + 1)):
+        for r in range(max(0, row - 1), min(self.height, row + 2)):
+            for c in range(max(0, column - 1), min(self.width, column + 2)):
                 cell = self.cells[r][c]
                 checked += 1 if cell.checked else 0
         return checked
 
     def count_closed(self, row: int, column: int) -> int:
         closed = 0
-        for r in range(max(0, row - 1), min(self.height, row + 1)):
-            for c in range(max(0, column - 1), min(self.width, column + 1)):
+        for r in range(max(0, row - 1), min(self.height, row + 2)):
+            for c in range(max(0, column - 1), min(self.width, column + 2)):
                 cell = self.cells[r][c]
                 closed += 0 if cell.open else 1
         return closed
@@ -121,14 +121,14 @@ class Board:
         target = self.cells[row][column]
         if target.open:
             if target.neighbor == self.count_closed(row, column):
-                for r in range(max(0, row - 1), min(self.height, row + 1)):
-                    for c in range(max(0, column - 1), min(self.width, column + 1)):
+                for r in range(max(0, row - 1), min(self.height, row + 2)):
+                    for c in range(max(0, column - 1), min(self.width, column + 2)):
                         cell = self.cells[r][c]
                         if not cell.open and not cell.checked:
                             cell.checked = True
             if target.neighbor == self.count_checked(row, column):
-                for r in range(max(0, row - 1), min(self.height, row + 1)):
-                    for c in range(max(0, column - 1), min(self.width, column + 1)):
+                for r in range(max(0, row - 1), min(self.height, row + 2)):
+                    for c in range(max(0, column - 1), min(self.width, column + 2)):
                         cell = self.cells[r][c]
                         if not cell.open and not cell.checked:
                             self.open(r, c)
