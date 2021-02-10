@@ -60,6 +60,11 @@ class Board:
             print(''.join(columns))
         print()
 
+    def load(path_problem) -> None:
+        pass
+
+    def save(path_problem) -> None:
+        pass
 
     def place_mines(self, percentage: float) -> None:
         for row in range(self.height):
@@ -70,14 +75,10 @@ class Board:
     def count_neighbors(self) -> None:
         for row in range(self.height):
             for column in range(self.width):
-                for r in range(-1, 2):
-                    row_target = row + r
-                    if 0 <= row_target < self.height:
-                        for c in range(-1, 2):
-                            column_target = column + c
-                            if 0 <= column_target < self.width:
-                                if self.cells[row_target][column_target].mine:
-                                    self.cells[row][column].increment_neighbor()
+                for r in range(max(0, row - 1), min(self.height, row + 2)):
+                    for c in range(max(0, column - 1), min(self.width, column + 2)):
+                        if self.cells[r][c].mine:
+                            self.cells[row][column].increment_neighbor()
 
     def open_initial_cell(self) -> None:
         undetermined = True
@@ -85,7 +86,8 @@ class Board:
             row = random.randrange(self.height)
             column = random.randrange(self.width)
             cell = self.cells[row][column]
-            if not cell.mine:
+#            if not cell.mine:
+            if cell.neighbor == 0:
                 print(f'{row}, {column}')
                 self.open(row, column)
                 undetermined = False
@@ -108,16 +110,18 @@ class Board:
 
     def open(self, row: int, column: int) -> None:
         success = True
+        board_changed = False
         cell = self.cells[row][column]
         if not cell.open:
+            cell.open = True
+            board_changed = True
             if cell.mine:
                 success = False
-            else:
-                cell.open = True
-                self.process_if_satisfied(row, column)
-        return success
+        return (success, board_changed)
 
     def process_if_satisfied(self, row: int, column: int) -> None:
+        success = True
+        board_changed = False
         target = self.cells[row][column]
         if target.open:
             if target.neighbor == self.count_closed(row, column):
@@ -126,34 +130,85 @@ class Board:
                         cell = self.cells[r][c]
                         if not cell.open and not cell.checked:
                             cell.checked = True
+                            board_changed = True
             if target.neighbor == self.count_checked(row, column):
                 for r in range(max(0, row - 1), min(self.height, row + 2)):
                     for c in range(max(0, column - 1), min(self.width, column + 2)):
                         cell = self.cells[r][c]
                         if not cell.open and not cell.checked:
-                            self.open(r, c)
+                            neighbor_success, neighbor_board_changed = self.open(r, c)
+                            success = success and neighbor_success
+                            board_changed = board_changed or neighbor_board_changed
+        return (success, board_changed)
 
-    def test(self):
+    def sweep(self):
+        success = True
+        board_changed = False
         for row in range(self.height):
             for column in range(self.width):
-                self.process_if_satisfied(row, column)
+                cell_success, cell_board_changed = self.process_if_satisfied(row, column)
+                success = success and cell_success
+                board_changed = board_changed or cell_board_changed
+        return (success, board_changed)
 
-    #def solve(self):
+    def check_if_solved(self):
+        checked = 0
+        mines = 0
+        for row in range(self.height):
+            for column in range(self.width):
+                cell = self.cells[row][column]
+                if cell.checked:
+                    checked += 1
+                if cell.mine:
+                    mines += 1
+        return mines == checked
 
-def main():
-    board = Board(10, 10)
+def test():
+    board = Board(20, 20)
     board.place_mines(0.9)
     board.show_mines()
     board.count_neighbors()
     board.show_neighbors()
     board.open_initial_cell()
-    board.show()
-    board.test()
-    board.show()
-    board.test()
-    board.show()
-    board.test()
-    board.show()
+    board_changed = True
+    success = True
+    loop = 0
+    while board_changed:
+        loop += 1
+        print(f'Loop: {loop}')
+        board.show()
+        success, board_changed = board.sweep()
+        if not success:
+            print('Failed! Wrong algorithm!')
+            break
+    solved = board.check_if_solved()
+    if solved:
+        print('Problem solved!')
+    else:
+        print('Hmm, problem not solved yet.')
+
+def main():
+    if 1 < len(sys.argv):
+        command = sys.argv[1]
+
+        if command == 'solve':
+            path_problem = sys.argv[2]
+            print(f'Solving problem {path_problem}')
+        elif command == 'generate':
+            path_problem = sys.argv[2]
+            height = int(sys.argv[3])
+            width = int(sys.argv[4])
+            mine_ratio = float(sys.argv[5])
+            print(f'Generating a problem with mine ratio {str(mine_ratio)} to {path_problem}')
+        elif command == 'test':
+            test()
+        else:
+            test()
+    else:
+        print('Usage:')
+        print('\tpython Minesweeper.py test')
+        print('\tpython Minesweeper.py solve <path to problem>')
+        print('\tpython Minesweeper.py generate <path to problem> <board height> <board width> <mine ratio>')
 
 if __name__ == '__main__':
     main()
