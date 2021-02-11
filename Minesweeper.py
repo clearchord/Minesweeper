@@ -1,5 +1,7 @@
 import sys
 import random
+from pathlib import Path
+from typing import List, Tuple
 
 class Cell:
     def __init__(self, row: int, column: int) -> None:
@@ -18,10 +20,7 @@ class Cell:
         if self.open:
             symbol = str(self.neighbor)
         else:
-            if self.checked:
-                symbol = '*'
-            else:
-                symbol = '?'
+            symbol = '*' if self.checked else '?'
         return symbol
 
     def set_mine(self, mine: bool) -> None:
@@ -60,16 +59,43 @@ class Board:
             print(''.join(columns))
         print()
 
-    def load(path_problem) -> None:
-        pass
+    def load(path_problem: str) -> None:
+        with open(path_problem, 'r', encoding='utf-8') as file:
+            height, width = list(map(int, file.readline().split()))
+            initialrow, initialcolumn = list(map(int, file.readline().split()))
+            mines = int(file.readline())
+            mine_positions = []
+            for _ in range(mines):
+                r, c = list(map(int, file.readline().split()))
+                mine_positions.append((r, c))
+        board = Board(height, width)
+        for row, column in mine_positions:
+            board.cells[row][column].set_mine(True)
+        board.count_neighbors()
+        board.initial_cell_position = (initialrow, initialcolumn)
+        board.open(initialrow, initialcolumn)
+        board.show()
+        return board                
 
-    def save(path_problem) -> None:
-        pass
+    def save(self, path_problem: str) -> None:
+        path = Path(path_problem)
+        if not path.parent.exists():
+            path.parent.mkdir()
+        with open(path, 'w', encoding='utf-8') as file:
+            file.write(f'{self.height} {self.width}\n')
+            file.write(f'{self.initial_cell_position[0]} {self.initial_cell_position[1]}\n')
+            mines = self.count_mines()
+            file.write(f'{mines}\n')
+            for row in range(self.height):
+                for column in range(self.width):
+                    cell = self.cells[row][column]
+                    if cell.mine:
+                        file.write(f'{row} {column}\n')
 
-    def place_mines(self, percentage: float) -> None:
+    def place_mines(self, mine_ratio: float) -> None:
         for row in range(self.height):
             for column in range(self.width):
-                if percentage < random.random():
+                if random.random() < mine_ratio:
                     self.cells[row][column].set_mine(True)
 
     def count_neighbors(self) -> None:
@@ -80,17 +106,28 @@ class Board:
                         if self.cells[r][c].mine:
                             self.cells[row][column].increment_neighbor()
 
-    def open_initial_cell(self) -> None:
-        undetermined = True
-        while undetermined:
+    def find_safe_cell_at_random(self) -> Tuple[int, int]:
+        found = None
+        while found is None:
             row = random.randrange(self.height)
             column = random.randrange(self.width)
-            cell = self.cells[row][column]
-#            if not cell.mine:
-            if cell.neighbor == 0:
-                print(f'{row}, {column}')
-                self.open(row, column)
-                undetermined = False
+            if self.cells[row][column].neighbor == 0:
+                print(f'safe cell: ({row}, {column}), neighbor: {self.cells[row][column].neighbor}')
+                found = (row, column)
+        return found
+
+    def open_initial_cell(self) -> None:
+        cell_position = self.find_safe_cell_at_random()
+        self.initial_cell_position = cell_position
+        self.open(cell_position[0], cell_position[1])
+
+    def count_mines(self):
+        mines = 0
+        for row in range(self.height):
+            for column in range(self.width):
+                if self.cells[row][column].mine:
+                    mines += 1
+        return mines
 
     def count_checked(self, row: int, column: int) -> int:
         checked = 0
@@ -151,6 +188,22 @@ class Board:
                 board_changed = board_changed or cell_board_changed
         return (success, board_changed)
 
+    def solve(self) -> None:
+        board_changed = True
+        success = True
+        loop = 0
+        while board_changed:
+            loop += 1
+            print(f'Loop: {loop}')
+            self.show()
+            success, board_changed = self.sweep()
+            if not success:
+                print('Failed! Wrong algorithm!')
+                break
+        solved = self.check_if_solved()
+        message = 'Problem solved!' if solved else 'Hmm, problem not solved yet.'
+        print(message)
+
     def check_if_solved(self):
         checked = 0
         mines = 0
@@ -163,43 +216,43 @@ class Board:
                     mines += 1
         return mines == checked
 
+def generate(height: int, width: int, mine_ratio: float):
+    board = Board(height, width)
+    board.place_mines(mine_ratio)
+    board.count_neighbors()
+    board.show_mines()
+    board.show_neighbors()
+    board.open_initial_cell()
+    board.show()
+    return board
+
 def test():
     board = Board(20, 20)
-    board.place_mines(0.9)
+    board.place_mines(0.2)
     board.show_mines()
     board.count_neighbors()
     board.show_neighbors()
     board.open_initial_cell()
-    board_changed = True
-    success = True
-    loop = 0
-    while board_changed:
-        loop += 1
-        print(f'Loop: {loop}')
-        board.show()
-        success, board_changed = board.sweep()
-        if not success:
-            print('Failed! Wrong algorithm!')
-            break
-    solved = board.check_if_solved()
-    if solved:
-        print('Problem solved!')
-    else:
-        print('Hmm, problem not solved yet.')
+    board.solve()
 
 def main():
     if 1 < len(sys.argv):
         command = sys.argv[1]
-
         if command == 'solve':
             path_problem = sys.argv[2]
             print(f'Solving problem {path_problem}')
+            board = Board.load(path_problem)
+            board.solve()
         elif command == 'generate':
             path_problem = sys.argv[2]
             height = int(sys.argv[3])
             width = int(sys.argv[4])
             mine_ratio = float(sys.argv[5])
             print(f'Generating a problem with mine ratio {str(mine_ratio)} to {path_problem}')
+            board = generate(height, width, mine_ratio)
+            board.save(path_problem)
+            board.process_if_satisfied(board.initial_cell_position[0], board.initial_cell_position[1])
+            board.show()
         elif command == 'test':
             test()
         else:
